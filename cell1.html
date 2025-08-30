@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ArcGIS Pro — Join Feature Service to FGDB Table (Python)</title>
+  <meta name="description" content="Safe, embeddable single-file code display for ArcGIS Experience Builder or Sites (via iframe).">
+  <style>
+    :root{--bg:#0b1320;--panel:#0f172a;--text:#e5e7eb;--muted:#94a3b8;--border:rgba(148,163,184,.18);}
+    *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
+    header{padding:18px 20px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(148,163,184,.08),rgba(15,23,42,.6))}
+    h1{font-size:18px;margin:0 0 4px;letter-spacing:.3px} .meta{font-size:13px;color:var(--muted)}
+    main{max-width:1100px;margin:0 auto;padding:22px 16px 40px} .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+    pre{margin:0;padding:16px 18px;overflow:auto;border-radius:12px;line-height:1.5;font-size:14px;background:transparent}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre}
+    .tok-c{color:#9ca3af;font-style:italic} .tok-s{color:#fcd34d} .tok-n{color:#fca5a5} .tok-k{color:#93c5fd} .tok-f{color:#86efac}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Join Feature Service to FGDB Table (ArcGIS Pro, Python)</h1>
+    <div class="meta">Embeddable display • No external CDNs • GitHub Pages friendly • Secrets redacted</div>
+  </header>
+  <main>
+    <div class="card">
+      <pre id="code"><code># this has a few more troubleshooting steps that are removed in the final notebook. (portal login, feature service url checking)
+# Cell 1 - configure services, assign join fields, connect to portal, create join (in memory)
+
+import arcpy
+import re
+
+# -------------------
+# USER SETTINGS
+# -------------------
+PORTAL_URL   = "https://maps.test.cce.af.mil/soe"  # Your portal URL
+PORTAL_USER  = "username"                      # Your username
+PORTAL_PASS  = "<password>"  # your password
+
+# Hosted Feature Service (rest endpoint of feature service)
+FEATURE_SERVICE_INPUT = r"https://maps.test.cce.af.mil/soe/rest/services/Hosted/Species_Location_Point_Fictional_Data_1/FeatureServer"
+DEFAULT_LAYER_ID = 0  # If root URL given, use this layer
+
+# FGDB table path (local path to the FGDB with table to join to feature service)
+FGDB_TABLE_PATH = r"C:\Users\cod11939\Desktop\AFGIMS\AFGIMS Join With Data\UrbanTreeInventoryInfo_Fictional_Table\_ags_dataC30F638EC5E24828BC8B7D014A80CFFD.gdb\UrbanTreeInventoryIn"
+
+# Join fields
+FEATURE_JOIN_FIELD = "specieslocationidpk"       # Enter join field key
+TABLE_JOIN_FIELD   = "specieslocationidfk"       # Enter join field key
+
+# -------------------
+# FUNCTIONS
+# -------------------
+def ensure_layer_url(url_or_item, default_layer_id=0):
+    \"\"\"Ensure we have a FeatureServer/<layerId> URL, not just the root.\"\"\"
+    s = url_or_item.strip()
+    if re.search(r\"/FeatureServer/\\d+$\", s, re.IGNORECASE):
+        return s
+    if re.search(r\"/FeatureServer/?$\", s, re.IGNORECASE):
+        return s.rstrip(\"/\") + f\"/{default_layer_id}\"
+    if re.search(r\"/MapServer\", s, re.IGNORECASE):
+        raise ValueError(\"Input points to a MapServer. Use a FeatureServer layer URL instead.\")
+    return s
+
+# -------------------
+# CONNECT TO PORTAL
+# -------------------
+if PORTAL_USER and PORTAL_PASS:
+    arcpy.SignInToPortal(PORTAL_URL, PORTAL_USER, PORTAL_PASS)
+    print(f\"Signed in to {PORTAL_URL}\")
+else:
+    print(\"Using current ArcGIS Pro portal session.\")
+
+# -------------------
+# SAFE REFRESH: clear only in-memory GP objects
+# -------------------
+for obj in (\"feature_lyr\", \"table_view\"):
+    try:
+        arcpy.management.Delete(obj)
+        print(f\"Deleted in-memory object: {obj}\")
+    except Exception:
+        pass
+
+# -------------------
+# CREATE LAYER + TABLE VIEW
+# -------------------
+feature_layer_url = ensure_layer_url(FEATURE_SERVICE_INPUT, DEFAULT_LAYER_ID)
+print(f\"Using layer URL: {feature_layer_url}\")
+
+# Hosted feature service → Feature Layer
+arcpy.management.MakeFeatureLayer(feature_layer_url, \"feature_lyr\")
+print(\"Feature layer created: feature_lyr\")
+
+# FGDB table → Table View
+arcpy.management.MakeTableView(FGDB_TABLE_PATH, \"table_view\")
+print(\"Table view created: table_view\")
+
+# -------------------
+# ADD JOIN
+# -------------------
+print(\"Adding join...\")
+arcpy.management.AddJoin(
+    in_layer_or_view=\"feature_lyr\",
+    in_field=FEATURE_JOIN_FIELD,
+    join_table=\"table_view\",
+    join_field=TABLE_JOIN_FIELD,
+    join_type=\"KEEP_ALL\",
+    index_join_fields=\"NO_INDEX_JOIN_FIELDS\",
+    rebuild_index=\"NO_REBUILD_INDEX\",
+    join_operation=\"JOIN_ONE_TO_FIRST\"
+)
+print(\"✅ Join complete (in memory). You can now export if needed.\")</code></pre>
+    </div>
+    <p class="meta" style="margin-top:10px;">⚠️ Do not publish real credentials. Use environment variables or OS keyring in production.</p>
+  </main>
+
+  <script>
+  // Minimal inline highlighter; remove if your CSP blocks inline scripts.
+  (function(){
+    var el = document.getElementById('code');
+    var html = el.innerHTML.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // comments
+    html = html.replace(/(^|\s)#.*$/gm, function(m){return '<span class="tok-c">'+m+'</span>'});
+    // strings
+    html = html.replace(/('[^'\n]*'|"[^"\n]*")/g, '<span class="tok-s">$1</span>');
+    // numbers
+    html = html.replace(/\b(\d+(\.\d+)?)\b/g, '<span class="tok-n">$1</span>');
+    // keywords (basic Python set)
+    html = html.replace(/\b(import|from|as|def|return|if|else|elif|for|in|try|except|raise|with|print|True|False|None)\b/g, '<span class="tok-k">$1</span>');
+    // common arcpy functions (highlight lightly)
+    html = html.replace(/\b(arcpy|management|MakeFeatureLayer|MakeTableView|AddJoin|SignInToPortal)\b/g, '<span class="tok-f">$1</span>');
+
+    el.innerHTML = html;
+  })();
+  </script>
+</body>
+</html>
